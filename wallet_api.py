@@ -9,7 +9,11 @@ def wallet_bp():
     def create_wallet():
         wallet = Wallet.create()
         return jsonify(wallet), 200
-
+        
+    @bp.route('/ping', methods=['GET'])
+    def ping():
+        return jsonify({'message': 'API Sunaryum online'}), 200
+        
     @bp.route('/import', methods=['POST'])
     def import_wallet():
         data = request.get_json()
