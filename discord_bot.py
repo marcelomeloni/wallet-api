@@ -14,6 +14,7 @@ SUPABASE_URL = os.getenv('SUPABASE_URL')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 VERIFY_CHANNEL_ID = int(os.getenv('DISCORD_VERIFY_CHANNEL_ID'))
 VERIFIED_ROLE_ID = int(os.getenv('DISCORD_VERIFIED_ROLE_ID'))
+API_BASE_URL = "https://airdrop-sunaryum.onrender.com"  # Seu link hospedado
 
 # Inicializa o Supabase
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -30,6 +31,7 @@ async def on_ready():
     print(f'✅ Bot conectado como {bot.user.name}')
     print(f'⚙️ Canal de verificação: {VERIFY_CHANNEL_ID}')
     print(f'🎯 Cargo verificado: {VERIFIED_ROLE_ID}')
+    print(f'🌐 API URL: {API_BASE_URL}')
 
 @bot.event
 async def on_message(message):
@@ -42,12 +44,19 @@ async def on_message(message):
     match = re.search(wallet_pattern, message.content)
     
     if not match:
-        await message.reply("🚫 **Formato inválido!** Por favor, envie apenas seu endereço de carteira (ex: `0x...` para Ethereum ou `Base58` para Solana)")
+        await message.reply(
+            "🚫 **Formato inválido!**\n"
+            "Por favor, envie apenas seu endereço de carteira.\n"
+            "Exemplos válidos:\n"
+            "- Ethereum: `0x742d35Cc6634C0532925a3b844Bc454e4438f44e`\n"
+            "- Solana: `4F3e6d7A8B9c0d1E2f3A4B5C6d7E8F9a0B1C2D3E`"
+        )
         return
 
     wallet_address = match.group(0)
     discord_id = str(message.author.id)
     discord_name = message.author.name
+    user_mention = message.author.mention
 
     try:
         # Verifica se a wallet já foi usada
@@ -57,7 +66,11 @@ async def on_message(message):
             .execute()
         
         if existing.data and len(existing.data) > 0:
-            await message.reply(f"⚠️ **Carteira já verificada!** Esta carteira `{wallet_address}` já está associada a outro usuário.")
+            await message.reply(
+                f"⚠️ **Carteira já verificada!**\n"
+                f"Esta carteira `{wallet_address}` já está associada a outro usuário.\n"
+                f"Se você acredita que isso é um erro, contate um administrador."
+            )
             return
 
         # Registra a verificação no banco de dados
@@ -73,12 +86,30 @@ async def on_message(message):
         role = guild.get_role(VERIFIED_ROLE_ID)
         await message.author.add_roles(role)
         
+        # Link de verificação para o usuário
+        verification_link = f"{API_BASE_URL}/api/check-discord-verification?wallet={wallet_address}"
+        
         # Resposta com confirmação
-        await message.reply(f"✅ **Verificação bem-sucedida!** Carteira `{wallet_address}` registrada. Bem-vindo(a) ao servidor, {message.author.mention}!")
+        await message.reply(
+            f"✅ **Verificação bem-sucedida!**\n"
+            f"Carteira `{wallet_address}` registrada com sucesso.\n"
+            f"Bem-vindo(a) ao servidor, {user_mention}!\n\n"
+            f"🔗 Você pode verificar seu status no site:\n"
+            f"[Clique aqui]({verification_link})"
+        )
+        
+        # Atualiza o usuário no banco principal
+        supabase.table('users').update({
+            'discord_id': discord_id
+        }).eq('wallet_address', wallet_address).execute()
 
     except Exception as e:
-        print(f"Erro na verificação: {e}")
-        await message.reply("❌ **Erro interno!** Por favor, tente novamente ou contate um administrador.")
+        print(f"Erro na verificação: {str(e)}")
+        await message.reply(
+            "❌ **Erro durante a verificação!**\n"
+            "Nossa equipe já foi notificada.\n"
+            "Por favor, tente novamente mais tarde."
+        )
 
 if __name__ == '__main__':
     bot.run(DISCORD_TOKEN)
