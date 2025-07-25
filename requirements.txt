@@ -1,7 +1,7 @@
 flask==2.3.3
 flask-cors==4.0.0
 python-dotenv==1.0.1
-supabase==2.1.1
+supabase==1.2.0
 discord.py==2.3.2
 ecdsa==0.18.0
 mnemonic==0.20
