@@ -5,7 +5,6 @@ annotated-types==0.7.0
 anyio==4.9.0
 APScheduler==3.11.0
 attrs==25.3.0
-# Remova audioop-lts
 bcrypt==4.1.2
 certifi==2024.6.2
 cffi==1.16.0
@@ -55,4 +54,3 @@ uvicorn==0.29.0
 watchfiles==0.21.0
 websockets==12.0
 Werkzeug==3.0.2
-yarl==1.9.4
