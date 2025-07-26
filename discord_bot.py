@@ -1,5 +1,4 @@
 import os
-import re
 import discord
 from discord.ext import commands
 from supabase import create_client, Client
@@ -37,21 +36,17 @@ async def on_message(message):
     if message.author.bot or message.channel.id != VERIFY_CHANNEL_ID:
         return
 
-    # Expressão regular para wallets
-    wallet_pattern = r'(0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})'
-    match = re.search(wallet_pattern, message.content)
+    # Remove espaços e quebras de linha
+    wallet_address = message.content.strip()
     
-    if not match:
+    # Verificação básica de comprimento
+    if len(wallet_address) < 20 or len(wallet_address) > 50:
         await message.reply(
             "🚫 **Formato inválido!**\n"
-            "Por favor, envie apenas seu endereço de carteira.\n"
-            "Exemplos:\n"
-            "- Ethereum: `0x742d35Cc6634C0532925a3b844Bc454e4438f44e`\n"
-            "- Solana: `4F3e6d7A8B9c0d1E2f3A4B5C6d7E8F9a0B1C2D3E`"
+            "Por favor, envie apenas seu endereço de carteira gerado pelo sistema Sunaryum."
         )
         return
 
-    wallet_address = match.group(0)
     discord_id = str(message.author.id)
     discord_name = message.author.name
 
