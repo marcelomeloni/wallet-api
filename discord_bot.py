@@ -1,4 +1,5 @@
 import os
+import re
 import discord
 from discord.ext import commands
 from supabase import create_client, Client
@@ -14,8 +15,20 @@ SUPABASE_KEY = os.getenv('SUPABASE_KEY')
 VERIFY_CHANNEL_ID = int(os.getenv('DISCORD_VERIFY_CHANNEL_ID'))
 VERIFIED_ROLE_ID = int(os.getenv('DISCORD_VERIFIED_ROLE_ID'))
 
+# Log inicial
+print(f"🟡 Iniciando bot...")
+print(f"🟡 SUPABASE_URL: {SUPABASE_URL}")
+print(f"🟡 SUPABASE_KEY: {SUPABASE_KEY[:5]}...")
+print(f"🟡 VERIFY_CHANNEL_ID: {VERIFY_CHANNEL_ID}")
+print(f"🟡 VERIFIED_ROLE_ID: {VERIFIED_ROLE_ID}")
+
 # Inicializa o Supabase
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+try:
+    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    print("✅ Conexão com Supabase estabelecida")
+except Exception as e:
+    print(f"❌ Erro ao conectar ao Supabase: {str(e)}")
+    exit(1)
 
 # Inicializa o bot
 intents = discord.Intents.default()
@@ -33,31 +46,37 @@ async def on_ready():
 @bot.event
 async def on_message(message):
     # Ignora mensagens de bots e de outros canais
-    if message.author.bot or message.channel.id != VERIFY_CHANNEL_ID:
+    if message.author.bot:
         return
 
-    # Remove espaços e quebras de linha
-    wallet_address = message.content.strip()
+    print(f"\n--- Nova mensagem de {message.author} no canal {message.channel.id} ---")
+    print(f"Conteúdo: '{message.content}'")
     
-    # Verificação básica de comprimento
-    if len(wallet_address) < 20 or len(wallet_address) > 50:
-        await message.reply(
-            "🚫 **Formato inválido!**\n"
-            "Por favor, envie apenas seu endereço de carteira gerado pelo sistema Sunaryum."
-        )
+    if message.channel.id != VERIFY_CHANNEL_ID:
+        print(f"❌ Mensagem fora do canal de verificação (esperado: {VERIFY_CHANNEL_ID})")
         return
 
+
+
+    wallet_address = match.group(0)
     discord_id = str(message.author.id)
     discord_name = message.author.name
 
+    print(f"✅ Carteira detectada: {wallet_address}")
+    print(f"🆔 Discord ID: {discord_id}")
+    print(f"👤 Discord Name: {discord_name}")
+
     try:
         # Verifica se a wallet já foi usada
-        existing = supabase.table('discord_verifications') \
-            .select('discord_id') \
+        print("🔍 Verificando se carteira já existe...")
+        response = supabase.table('discord_verifications') \
+            .select('*') \
             .eq('wallet_address', wallet_address) \
             .execute()
         
-        if existing.data and len(existing.data) > 0:
+        if response.data and len(response.data) > 0:
+            existing = response.data[0]
+            print(f"⚠️ Carteira já verificada por: {existing['discord_name']} (ID: {existing['discord_id']})")
             await message.reply(
                 f"⚠️ **Carteira já verificada!**\n"
                 f"Esta carteira `{wallet_address}` já está associada a outro usuário."
@@ -65,17 +84,29 @@ async def on_message(message):
             return
 
         # Registra a verificação no banco de dados
-        supabase.table('discord_verifications').upsert({
+        print("📝 Registrando nova verificação...")
+        response = supabase.table('discord_verifications').insert({
             'wallet_address': wallet_address,
             'discord_id': discord_id,
-            'discord_name': discord_name,
-            'verified_at': 'now()'
+            'discord_name': discord_name
         }).execute()
+        
+        if response.error:
+            print(f"❌ Erro ao inserir: {response.error}")
+        else:
+            print(f"✅ Registro inserido com sucesso: {response.data}")
 
         # Atribui o cargo de verificado
         guild = message.guild
         role = guild.get_role(VERIFIED_ROLE_ID)
+        
+        if not role:
+            print(f"❌ Cargo de verificado não encontrado! ID: {VERIFIED_ROLE_ID}")
+            await message.reply("❌ Cargo de verificado não configurado corretamente!")
+            return
+            
         await message.author.add_roles(role)
+        print(f"🎯 Cargo atribuído: {role.name}")
         
         # Resposta com confirmação
         await message.reply(
@@ -85,11 +116,13 @@ async def on_message(message):
         )
 
     except Exception as e:
-        print(f"Erro na verificação: {str(e)}")
+        print(f"🔥 ERRO: {str(e)}")
         await message.reply(
             "❌ **Erro durante a verificação!**\n"
-            "Tente novamente ou contate um administrador."
+            "Tente novamente ou contate um administrador.\n"
+            f"Detalhes: `{str(e)}`"
         )
 
 if __name__ == '__main__':
+    print("\n🚀 Iniciando bot...")
     bot.run(DISCORD_TOKEN)
